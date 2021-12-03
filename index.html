@@ -1,0 +1,373 @@
+<!doctype html>
+<html>
+
+<head>
+    <title>FISH IN THE OCEAN</title>
+</head>
+
+<body>
+    <canvas id="ocean" width="1100" height="500"></canvas>
+    <input id="slider" type="range" min="0" max="100" />
+    <script type="text/javascript" src="gl-matrix-min.js"></script>
+
+    <script>
+        function setup() {
+            var canvas = document.getElementById('ocean');
+            var context = canvas.getContext('2d');
+            canvas.style.background = "#38afcd";
+            var slider = document.getElementById('slider');
+            slider.value = 0;
+            var tParam = 0;
+
+
+            function draw() {
+                context.clearRect(0, 0, canvas.width, canvas.height);
+                var viewAngle = slider.value * 0.02 * Math.PI;
+                
+                // Create Camera (lookAt) transform
+                var dcam = 400.0;
+                var locCamera = vec3.create();
+
+                locCamera[0] = dcam * Math.sin(viewAngle);
+                locCamera[1] = 100;
+                locCamera[2] = dcam * Math.cos(viewAngle);
+
+                var TlookAt = mat4.create();
+                var vecUp = vec3.fromValues(0, 1, 0);
+                var locTarget = vec3.fromValues(0, 0, 0);
+
+                mat4.lookAt(TlookAt, locCamera, locTarget, vecUp)
+
+                // Create ViewPort transform
+                var Tviewport = mat4.create();
+                mat4.fromTranslation(Tviewport, [300, 340, 0]);
+                mat4.scale(Tviewport, Tviewport, [90, -110, 1]);
+
+
+                // Create observer projection transform
+                var TprojectionObserver = mat4.create();
+                mat4.ortho(TprojectionObserver, -110, 110, -110, 110, -1, 1);
+
+                // Create transform t_VP_CAM that incorporates Viewport and Camera transformations
+                var tVP_CAM = mat4.create();
+                mat4.multiply(tVP_CAM, Tviewport, TlookAt);
+
+
+
+                // Create transform t_VP_PROJ_CAM that incorporates Viewport, projection and camera transforms
+                var tVP_PROJ_VIEW_Observer = mat4.create();
+                mat4.multiply(tVP_PROJ_VIEW_Observer, Tviewport, TprojectionObserver);
+                mat4.multiply(tVP_PROJ_VIEW_Observer, tVP_PROJ_VIEW_Observer, TlookAt);
+
+                context.setLineDash([5, 10]);
+                drawTrajectory(0.0, 1.0, 100, C0, tVP_CAM, "red");
+                drawTrajectory(0.0, 1.0, 100, C1, tVP_CAM, "orange");
+                drawTrajectory(0.0, 1.0, 100, C2, tVP_CAM, "yellow");
+                drawTrajectory(0.0, 1.0, 100, C3, tVP_CAM, "green");
+                drawTrajectory(0.0, 1.0, 100, C4, tVP_CAM, "brown");
+
+                if (tParam > 5) {
+                    tParam = 0;
+                } else {
+                    tParam += 1 * 0.01;
+                }
+
+                // Create model(ing) transform (from moving object to world)
+                var Tmodel = mat4.create();
+                mat4.fromTranslation(Tmodel, Cf(tParam));
+                var tangent = Ccomp_tangent(tParam);
+                var angle = Math.atan2(tangent[1], tangent[0]);
+                mat4.rotateZ(Tmodel, Tmodel, angle);
+
+                // Create transform t_VP_CAM_MOD that incorporates Viewport, camera, and modeling transform
+                var tVP_CAM_MOD = mat4.create();
+                mat4.multiply(tVP_CAM_MOD, tVP_CAM, Tmodel);
+                drawObject(tVP_CAM_MOD);
+
+
+
+                window.requestAnimationFrame(draw);
+
+            }
+
+            function moveToTx(loc, Tx) {
+                var res = vec3.create();
+                vec3.transformMat4(res, loc, Tx);
+                context.moveTo(res[0], res[1]);
+            }
+
+            function lineToTx(loc, Tx) {
+                var res = vec3.create();
+                vec3.transformMat4(res, loc, Tx);
+                context.lineTo(res[0], res[1]);
+            }
+
+            function arcToTx(cx, cy, r, sr, er, Tx) {
+                var res = vec2.create();
+                vec2.transformMat4(res, [cx, cy], Tx);
+                context.arc(res[0], res[1], r, sr, er);
+            }
+
+            function rectToTx(x, y, w, h, Tx) {
+                var res = vec2.create();
+                vec2.transformMat4(res, [x, y], Tx);
+                context.rect(res[0], res[1], w, h);
+            }
+
+            function drawObject(Tx) {
+                drawBody(Tx);
+                drawTopFin(Tx);
+                drawSideFin(Tx);
+                drawEye(Tx);
+            }
+            function drawBody(Tx) {
+                context.beginPath();
+                context.fillStyle = "#52643f";
+                moveToTx([-.1, -.1, 0], Tx);
+                lineToTx([.3, -.1, 0], Tx);
+                lineToTx([.5, 0, 0], Tx);
+                lineToTx([.3, .1, 0], Tx);
+                lineToTx([-.1, .1, 0], Tx);
+                lineToTx([-.6, 0, 0], Tx);
+                lineToTx([-.8, .1, 0], Tx);
+                lineToTx([-.7, 0, 0], Tx);
+                lineToTx([-.8, -.1, 0], Tx);
+                lineToTx([-.6, 0, 0], Tx);
+                context.closePath();
+                context.fill();
+                //head
+                context.beginPath();
+                moveToTx([.5, 0, 0], Tx);
+                lineToTx([.3, 0, .1], Tx);
+                lineToTx([.3, .1, 0], Tx);
+                context.closePath();
+                context.fill();
+
+                context.beginPath();
+                moveToTx([.5, 0, 0], Tx);
+                lineToTx([.3, 0, .1], Tx);
+                lineToTx([.3, -.1, 0], Tx);
+                context.closePath();
+                context.fill();
+
+                context.beginPath();
+                moveToTx([.5, 0, 0], Tx);
+                lineToTx([.3, 0, -.1], Tx);
+                lineToTx([.3, .1, 0], Tx);
+                context.closePath();
+                context.fill();
+
+                context.beginPath();
+                moveToTx([.5, 0, 0], Tx);
+                lineToTx([.3, 0, -.1], Tx);
+                lineToTx([.3, -.1, 0], Tx);
+                context.closePath();
+                context.fill();
+                //body
+                context.beginPath();
+                moveToTx([.3, 0, -.1], Tx);
+                lineToTx([-.1, 0, -.1], Tx);
+                lineToTx([-.1, -.1, 0], Tx);
+                lineToTx([.3, -.1, 0], Tx);
+                context.closePath();
+                context.fill();
+
+                context.beginPath();
+                moveToTx([.3, 0, -.1], Tx);
+                lineToTx([-.1, 0, -.1], Tx);
+                lineToTx([-.1, .1, 0], Tx);
+                lineToTx([.3, .1, 0], Tx);
+                context.closePath();
+                context.fill();
+
+                context.beginPath();
+                moveToTx([.3, 0, .1], Tx);
+                lineToTx([-.1, 0, .1], Tx);
+                lineToTx([-.1, -.1, 0], Tx);
+                lineToTx([.3, -.1, 0], Tx);
+                context.closePath();
+                context.fill();
+
+                context.beginPath();
+                moveToTx([.3, 0, .1], Tx);
+                lineToTx([-.1, 0, .1], Tx);
+                lineToTx([-.1, .1, 0], Tx);
+                lineToTx([.3, .1, 0], Tx);
+                context.closePath();
+                context.fill();
+                //tail
+                context.beginPath();
+                moveToTx([-.6, 0, 0], Tx);
+                lineToTx([-.1, 0, -.1], Tx);
+                lineToTx([-.1, .1, 0], Tx);
+                context.closePath();
+                context.fill();
+
+                context.beginPath();
+                moveToTx([-.6, 0, 0], Tx);
+                lineToTx([-.1, 0, -.1], Tx);
+                lineToTx([-.1, -.1, 0], Tx);
+                context.closePath();
+                context.fill();
+
+                context.beginPath();
+                moveToTx([-.6, 0, 0], Tx);
+                lineToTx([-.1, 0, .1], Tx);
+                lineToTx([-.1, .1, 0], Tx);
+                context.closePath();
+                context.fill();
+
+                context.beginPath();
+                moveToTx([-.6, 0, 0], Tx);
+                lineToTx([-.1, 0, .1], Tx);
+                lineToTx([-.1, -.1, 0], Tx);
+                context.closePath();
+                context.fill();
+
+
+
+            }
+            function drawTopFin(Tx) {
+                context.beginPath();
+                context.fillStyle = "#4e5a29";
+                moveToTx([.2, .1, 0], Tx);
+                lineToTx([-.1, .2, 0], Tx);
+                lineToTx([.05, .1, 0], Tx);
+                context.closePath();
+                context.fill();
+            }
+            function drawSideFin(Tx) {
+
+                context.beginPath();
+                context.fillStyle = "#4e5a29";
+                moveToTx([.2, 0, -.1], Tx);
+                lineToTx([0, -.2, -.2], Tx);
+                lineToTx([.1, 0, -.1], Tx);
+                context.closePath();
+                context.fill();
+
+                context.beginPath();
+                context.fillStyle = "#4e5a29";
+                moveToTx([.2, 0, .1], Tx);
+                lineToTx([0, -.2, .2], Tx);
+                lineToTx([.1, 0, .1], Tx);
+                context.closePath();
+                context.fill();
+            }
+            function drawEye(Tx) {
+                context.beginPath();
+                context.fillStyle = "rgba(239,68,85,.8)";
+                arcToTx(.35, .05, 2, 0, 2 * Math.PI, Tx);
+                context.fill();
+            }
+
+
+            var HermiteDerivative = function (t) {
+                return [
+                    6 * t * t - 6 * t,
+                    3 * t * t - 4 * t + 1,
+                    -6 * t * t + 6 * t,
+                    3 * t * t - 2 * t
+                ];
+            }
+            var Hermite = function (t) {
+                return [
+                    2 * t * t * t - 3 * t * t + 1,
+                    t * t * t - 2 * t * t + t,
+                    -2 * t * t * t + 3 * t * t,
+                    t * t * t - t * t
+                ];
+            }
+
+
+            function Cubic(basis, P, t) {
+                var b = basis(t);
+                var result = vec3.create();
+                vec3.scale(result, P[0], b[0]);
+                vec3.scaleAndAdd(result, result, P[1], b[1]);
+                vec3.scaleAndAdd(result, result, P[2], b[2]);
+                vec3.scaleAndAdd(result, result, P[3], b[3]);
+                return result;
+            }
+
+            var P0 = [[0, 1, .5], [1, 1, .5], [2, 2, -1], [3, -1, -1]];
+            var P1 = [[2, 2, -1], [3, -1, -1], [4, 1, .5], [-1, 3, .5]];
+            var P2 = [[4, 1, .5], [-1, 3, .5], [6, 2, -.5], [2, -1, -.5]];
+            var P3 = [[6, 2, -.5], [2, -1, -.5], [8, 0, .3], [1, 3, .3]];
+            var P4 = [[8, 0, .3], [1, 3, .3], [10, 2, 0], [2, -1, 0]];
+
+            var C0 = function (t) { return Cubic(Hermite, P0, t); };
+            var C1 = function (t) { return Cubic(Hermite, P1, t); };
+            var C2 = function (t) { return Cubic(Hermite, P2, t); };
+            var C3 = function (t) { return Cubic(Hermite, P3, t); };
+            var C4 = function (t) { return Cubic(Hermite, P4, t); };
+
+            var C0prime = function (t) {
+                return Cubic(HermiteDerivative, P0, t);
+            };
+            var C1prime = function (t) {
+                return Cubic(HermiteDerivative, P1, t);
+            };
+            var C2prime = function (t) {
+                return Cubic(HermiteDerivative, P2, t);
+            };
+            var C3prime = function (t) {
+                return Cubic(HermiteDerivative, P3, t);
+            };
+            var C4prime = function (t) {
+                return Cubic(HermiteDerivative, P4, t);
+            };
+
+            var Cf = function (t) {
+                if (t < 1) {
+                    return C0(t);
+                } else if (t < 2) {
+                    return C1(t - 1)
+                } else if (t < 3) {
+                    return C2(t - 2)
+                } else if (t < 4) {
+                    return C3(t - 3);
+                } else {
+                    return C4(t - 4);
+                }
+            }
+
+            var Ccomp_tangent = function (t) {
+                if (t < 1) {
+                    var u = t;
+                    return C0prime(u);
+                } else if (t < 2) {
+                    var u = t - 1;
+                    return C1prime(u)
+                } else if (t < 3) {
+                    var u = t - 2;
+                    return C2prime(u)
+                } else if (t < 4) {
+                    var u = t - 3;
+                    return C3prime(u);
+                } else {
+                    var u = t - 4;
+                    return C4prime(u);
+                }
+            }
+
+            function drawTrajectory(t_begin, t_end, intervals, C, Tx, color) {
+                context.lineWidth = 3;
+                context.strokeStyle = color;
+                context.beginPath();
+                moveToTx(C(t_begin), Tx);
+                for (var i = 1; i <= intervals; i++) {
+                    var t = ((intervals - i) / intervals) * t_begin + (i / intervals) * t_end;
+                    lineToTx(C(t), Tx);
+                }
+                context.stroke();
+            }
+
+            draw();
+        }
+
+        window.onload = setup;
+    </script>
+</body>
+
+</html>
